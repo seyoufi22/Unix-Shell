@@ -11,8 +11,9 @@ void Cd(char **);
 void Path(char **);
 void Exit(char **);
 char **parsing(char *);
+void execute(char **);
 
-
+int path_cnt = 0;
 char **path_dirs;
 char *builtin_cmd[] = {"cd", "exit", "path"};
 void (*builtin_fun[])(char **) = {
@@ -26,18 +27,16 @@ int builtins_no() {
    	return sizeof(builtin_cmd) / sizeof(char *);
 }
 
-int paths_no(){
-	return sizeof(path_dirs) / sizeof(char *); 
-}
-
 void Error(){
 	char error_message[30] = "An error has occurred\n";
         write(1, error_message, strlen(error_message));
 }
 
 void Exit(char ** args){
-	if (args[1] != NULL) Error();  // Check for extra arguments after "exit"
-	printf("See You Later\n");
+	if (args[1] != NULL){
+		Error();  // Check for extra arguments after "exit"
+		return;
+	}
 	exit(0);
 }
 void Cd(char **args){
@@ -49,11 +48,12 @@ void Cd(char **args){
 
 void free_paths(){
 	if (path_dirs == NULL)return;
-	for(int i = 0; i < paths_no(); i++){
+	for(int i = 0; i < path_cnt; i++){
 		free(path_dirs[i]);
 	}
 	free(path_dirs);
 	path_dirs = NULL;
+	path_cnt = 0;
 }
 
 void Path(char **args){
@@ -71,11 +71,11 @@ void Path(char **args){
 			Error();
 		}
 	}
-	path_dris[path_c - 1] = NULL;
+	path_dirs[path_c - 1] = NULL;
+	path_cnt = path_c - 1;
 }
 
 
-void Path(char **args){}
 
 // parse the input into and array of tokens
 char **parsing(char *line){
@@ -111,21 +111,35 @@ bool builtin_command(char ** args){
 
 }
 
-bool execute(char **args){
+void execute_command(char **args){
+	if (args[0] == NULL)return;
+	for(int i = 0; i < path_cnt; i++){
+		int len = strlen(path_dirs[i]) + strlen(args[0]) + 2;
+	        char *full_path = malloc(len * sizeof(char));
+	        strcpy(full_path, path_dirs[i]);
+       	 	strcat(full_path, "/");
+       		strcat(full_path, args[0]);
+	
+		if (!access(full_path, X_OK)){
+			execv(full_path, args);
+		}
+		free(full_path);
+	}
+	Error();
+}
+
+void execute(char **args){
 	if (builtin_command(args)){
-		return 1;
+		return;
 	}
  	else {
 		pid_t ch = fork();
 		if (!ch){
-			if (builtin_command(args)){
-				return 1;
-			}
+			execute_command(args);
 			exit(0);
 		}
 		else if (ch > 0){
 			wait(NULL);
-			return true;
 		}
 		else Error();
 	}
@@ -136,8 +150,7 @@ void loop(FILE *stream, bool interactive){
         ssize_t nread;
         size_t len;
 	char **args;
-	int status = 1;
-	while(status){
+	while(true){
 		if (interactive){
 			printf("wish> ");
 			fflush(stdout);
@@ -146,9 +159,8 @@ void loop(FILE *stream, bool interactive){
 		nread = getline(&line,&len, stdin);
 
 		args = parsing(line);
-
-		status = execute(args);
-
+		
+		execute(args);
 		// free memory
 		free(line);
 		line = NULL;
