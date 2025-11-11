@@ -13,6 +13,7 @@ void Exit(char **);
 char **parsing(char *);
 
 
+char **path_dirs;
 char *builtin_cmd[] = {"cd", "exit", "path"};
 void (*builtin_fun[])(char **) = {
 	&Cd,
@@ -22,7 +23,11 @@ void (*builtin_fun[])(char **) = {
 
 // To make getting the size easier in the future
 int builtins_no() {
-    return sizeof(builtin_cmd) / sizeof(char *);
+   	return sizeof(builtin_cmd) / sizeof(char *);
+}
+
+int paths_no(){
+	return sizeof(path_dirs) / sizeof(char *); 
 }
 
 void Error(){
@@ -41,6 +46,34 @@ void Cd(char **args){
 		Error();
 	}
 }
+
+void free_paths(){
+	if (path_dirs == NULL)return;
+	for(int i = 0; i < paths_no(); i++){
+		free(path_dirs[i]);
+	}
+	free(path_dirs);
+	path_dirs = NULL;
+}
+
+void Path(char **args){
+	free_paths();
+	if (args[1] == NULL)return;
+	int path_c = 0;
+	while(args[++path_c] != NULL)
+	path_dirs = malloc(path_c * sizeof(char *));
+	if (path_dirs == NULL){
+		Error();
+	}
+	for(int i = 0; i < path_c - 1; i++){
+		path_dirs[i] = strdup(args[i + 1]);
+		if (path_dirs[i] == NULL){
+			Error();
+		}
+	}
+	path_dris[path_c - 1] = NULL;
+}
+
 
 void Path(char **args){}
 
@@ -79,7 +112,7 @@ bool builtin_command(char ** args){
 }
 
 bool execute(char **args){
-	if (builtin_command(args){
+	if (builtin_command(args)){
 		return 1;
 	}
  	else {
