@@ -172,29 +172,9 @@ int main(int argc, char *argv[]){
 	if (argc > 2){
 		Error();
 	}else if (argc == 2){
-
+		
 	}else{
 		loop(stdin, true);
-		exit(1);
-		while(true){
-			printf("wish> ");
-			char *line = NULL;
-			ssize_t nread;
-			size_t len;
-			nread = getline(&line, &len, stdin);
-			pid_t ch = fork();
-			if (!ch){
-				printf("I'm the child HEEEY !!\n");
-				exit(0);
-			}
-			else if (ch > 1){
-				wait(NULL);
-				printf("I'm the parent be quite\n");
-			}
-			else {
-				printf("Nothing Happend\n");
-			}
-		}
 	}
  	
 	return 0;
