@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -29,7 +30,7 @@ int builtins_no() {
 
 void Error(){
 	char error_message[30] = "An error has occurred\n";
-        write(1, error_message, strlen(error_message));
+        write(2, error_message, strlen(error_message));
 }
 
 void Exit(char ** args){
@@ -111,21 +112,43 @@ bool builtin_command(char ** args){
 
 }
 
+
+int check_redirection(char ** args){
+	int c = 0, pos = -1;
+	for(int i = 0; args[i] != NULL; i++){
+		if (!strcmp(args[i], ">")){
+			c++;
+			pos = i;
+		}
+	}
+	if (c > 1)pos = 0;
+	return pos;
+}
+
+bool valid_redirection(char ** args, int pos){
+	return args[pos] != NULL && args[pos + 1] == NULL;
+}
+
 void execute_command(char **args){
 	if (args[0] == NULL)return;
 	for(int i = 0; i < path_cnt; i++){
 		int len = strlen(path_dirs[i]) + strlen(args[0]) + 2;
 	        char *full_path = malloc(len * sizeof(char));
+
 	        strcpy(full_path, path_dirs[i]);
        	 	strcat(full_path, "/");
        		strcat(full_path, args[0]);
-	
+
 		if (!access(full_path, X_OK)){
 			execv(full_path, args);
 		}
 		free(full_path);
 	}
 	Error();
+}
+
+void Free_Redirection(char ** args, int pos){
+	args[pos] = NULL;
 }
 
 void execute(char **args){
@@ -135,7 +158,34 @@ void execute(char **args){
  	else {
 		pid_t ch = fork();
 		if (!ch){
-			execute_command(args);
+			int pos = check_redirection(args);
+			if (!pos){
+				printf("HDF\n");
+				Error();
+			}
+			else if (~pos){
+				if (valid_redirection(args, pos + 1)){
+					char *output_file = args[pos + 1];
+					int fd = open(output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+					if (fd < 0){
+						Error();
+					}
+					else {
+						if (dup2(fd, 1) < 0) {
+            						Error();
+        					}
+						else {
+							close(fd);
+							Free_Redirection(args, pos);
+							execute_command(args);
+						}
+					}
+				}
+				else Error();
+			}
+			else{
+				execute_command(args);
+			}
 			exit(0);
 		}
 		else if (ch > 0){
@@ -144,6 +194,9 @@ void execute(char **args){
 		else Error();
 	}
 }
+
+
+
 void loop(FILE *stream, bool interactive){
 
 	char *line = NULL;
@@ -156,8 +209,10 @@ void loop(FILE *stream, bool interactive){
 			fflush(stdout);
 		}
 
-		nread = getline(&line,&len, stdin);
-
+		nread = getline(&line,&len, stream);
+		if (nread == -1) {
+                    break; // Exit the loop
+                }
 		args = parsing(line);
 		
 		execute(args);
@@ -172,7 +227,13 @@ int main(int argc, char *argv[]){
 	if (argc > 2){
 		Error();
 	}else if (argc == 2){
-		
+		FILE *fp = fopen(argv[1], "r");
+		if (fp == NULL){
+			Error();
+			exit(1);
+		}
+		loop(fp, false);
+		fclose(fp);
 	}else{
 		loop(stdin, true);
 	}
